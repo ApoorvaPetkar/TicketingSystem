@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import TicketingSystem.dto.AvailableSeatsDto;
 import TicketingSystem.dto.ReservationResponseDto;
 import TicketingSystem.dto.ScreenInfoDto;
 import TicketingSystem.dto.ScreenInfoDto.RowInfo;
@@ -126,5 +127,46 @@ public class BookingResourceImpl {
             seats.put(row.getRowName(), availableSeats);
         });
         seatInfoDto.setSeats(seats);
+    }
+
+    public Boolean updateAvailableSeatsInfoPerChoice(Screen screenByName,
+                                                  AvailableSeatsDto availableSeatsDto,
+                                                  Integer numSeats,
+                                                  String rowName,
+                                                  Integer seatNo) {
+
+        boolean isAvailable = Boolean.TRUE;
+        Map<String, List<Integer>> availableSeats = new HashMap<>();
+        List<Integer> responseSeats = new ArrayList<>();
+        for (Row row : screenByName.getRows()){
+            if (row.getRowName().equalsIgnoreCase(rowName) && numSeats < row.getNoOfSeats()
+                    && seatNo < row.getNoOfSeats() && seatNo >= 0 && numSeats >= 0){
+                //forward seats
+                if ((seatNo + numSeats) <= row.getNoOfSeats()) {
+                    for (int i=seatNo; i<numSeats+seatNo; i++){
+                        Seat seat = row.getSeats().get(i);
+                        responseSeats.add(i);
+                        if (seat.getStatus().equals(Status.RESERVED) ||
+                                (i!=seatNo && (numSeats == 2 || (i != numSeats+seatNo-1)) && seat.isAisle())){
+                            isAvailable = Boolean.FALSE;
+                        }
+                    }
+                }
+                if (((seatNo - (numSeats-1)) >= 0) && isAvailable == Boolean.FALSE){ // backward seats
+                    isAvailable = Boolean.TRUE;
+                    responseSeats.clear();
+                    for (int i=0; i<seatNo; i++){
+                        Seat seat = row.getSeats().get(i);
+                        responseSeats.add(i);
+                        if (seat.getStatus().equals(Status.RESERVED) || (i>0 && i<seatNo && seat.isAisle())){
+                            isAvailable = Boolean.FALSE;
+                        }
+                    }
+                }
+                availableSeats.put(rowName, responseSeats);
+            }
+        }
+        availableSeatsDto.setAvailableSeats(availableSeats);
+        return isAvailable;
     }
 }

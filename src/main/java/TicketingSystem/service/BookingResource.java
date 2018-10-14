@@ -4,10 +4,12 @@ package TicketingSystem.service;
 import static TicketingSystem.dto.ReservationResponseDto.Status.SUCCESS;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 import TicketingSystem.NotFoundException;
+import TicketingSystem.dto.AvailableSeatsDto;
 import TicketingSystem.dto.ReservationResponseDto;
 import TicketingSystem.dto.ScreenInfoDto;
 import TicketingSystem.dto.SeatInfoDto;
@@ -19,6 +21,7 @@ import TicketingSystem.repository.SeatRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,7 +64,7 @@ public class BookingResource {
         return screenByName;
     }
 
-    @GetMapping("/screen/{screenName}/seats")
+    @GetMapping("/screens/{screenName}/seatss")
     public ResponseEntity<?> getAvailableSeats(@PathVariable String screenName,
                                     @RequestParam(required = true, value = "status") String status) {
 
@@ -78,6 +81,32 @@ public class BookingResource {
 
         return new ResponseEntity<>("Valid status is required as paramter", HttpStatus.INTERNAL_SERVER_ERROR);
 
+    }
+
+    @GetMapping("/screens/{screenName}/seats")
+    public ResponseEntity<?> getAvailableSeatsAtGivePosition(@PathVariable String screenName,
+                                                             @RequestParam(required = true, value = "numSeats") Integer numSeats,
+                                                             @RequestParam(required = true, value = "choice") String choice) {
+        AvailableSeatsDto availableSeatsDto = new AvailableSeatsDto();
+        Screen screenByName = screenRepository.getScreenByName(screenName);
+        if (screenByName == null) {
+            throw new NotFoundException(screenName);
+        }
+        char rowName = choice.charAt(0);
+        if ((rowName >= 'A' && rowName <= 'Z')){
+            Integer seatNo = Integer.valueOf(choice.substring(1));
+            Boolean isAvailable = bookingResourceImpl.updateAvailableSeatsInfoPerChoice(screenByName, availableSeatsDto,
+                    numSeats, choice.substring(0, 1), seatNo);
+            if(isAvailable){
+                return new ResponseEntity<>(availableSeatsDto, HttpStatus.OK);
+            }
+            AvailableSeatsDto emptyDto = new AvailableSeatsDto();
+            emptyDto.setAvailableSeats(Collections.emptyMap());
+            return new ResponseEntity<>(emptyDto, HttpStatus.OK);
+
+        }else{
+            return new ResponseEntity<>("Invalid Row Name Added as choice", HttpStatus.OK);
+        }
     }
 
     @PostMapping("/screen/{screenName}/reserve")
