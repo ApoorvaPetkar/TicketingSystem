@@ -1,14 +1,18 @@
 package TicketingSystem.service;
 
 
+import static TicketingSystem.common.Constants.INVALID_ROWNAME;
+import static TicketingSystem.common.Constants.INVALID_STATUS_PARAM;
+import static TicketingSystem.common.Constants.RESERVED;
+import static TicketingSystem.common.Constants.UN_RESERVED;
 import static TicketingSystem.dto.ReservationResponseDto.Status.SUCCESS;
 
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 import TicketingSystem.NotFoundException;
+import TicketingSystem.common.Utility;
 import TicketingSystem.dto.AvailableSeatsDto;
 import TicketingSystem.dto.ReservationResponseDto;
 import TicketingSystem.dto.ScreenInfoDto;
@@ -21,7 +25,6 @@ import TicketingSystem.repository.SeatRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +32,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+/*
+This class handles all the APIs exposed to UI
+ */
 
 @RestController
 public class BookingResource {
@@ -43,19 +50,19 @@ public class BookingResource {
     private RowRepository rowRepository;
 
     @Autowired
-    BookingResourceImpl bookingResourceImpl;
+    private BookingResourceImpl bookingResourceImpl;
 
-	@GetMapping("/screen")
+	@GetMapping("/screens")
 	public List<Screen> retrieveAllScreens() {
 		return screenRepository.findAll();
 	}
 
-    @GetMapping("/screen/rows")
+    @GetMapping("/screens/rows")
     public List<Row> getAllRows() {
         return rowRepository.findAll();
     }
 
-    @GetMapping("/screen/{screenName}")
+    @GetMapping("/screens/{screenName}")
     public Screen getScreen(@PathVariable String screenName) {
         Screen screenByName = screenRepository.getScreenByName(screenName);
         if (screenByName == null){
@@ -70,7 +77,7 @@ public class BookingResource {
 
 	    SeatInfoDto seatInfoDto = new SeatInfoDto();
 
-        if (Objects.equals(status, "reserved") || Objects.equals(status, "unreserved")){
+        if (Objects.equals(status, RESERVED) || Objects.equals(status, UN_RESERVED)){
             Screen screenByName = screenRepository.getScreenByName(screenName);
             if (screenByName == null){
                 throw new NotFoundException(screenName);
@@ -79,7 +86,7 @@ public class BookingResource {
             return new ResponseEntity<>(seatInfoDto, HttpStatus.OK);
         }
 
-        return new ResponseEntity<>("Valid status is required as paramter", HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(INVALID_STATUS_PARAM, HttpStatus.BAD_REQUEST);
 
     }
 
@@ -95,21 +102,19 @@ public class BookingResource {
         char rowName = choice.charAt(0);
         if ((rowName >= 'A' && rowName <= 'Z')){
             Integer seatNo = Integer.valueOf(choice.substring(1));
-            Boolean isAvailable = bookingResourceImpl.updateAvailableSeatsInfoPerChoice(screenByName, availableSeatsDto,
+            Boolean isAvailable = bookingResourceImpl.checkSeatAvailablity(screenByName, availableSeatsDto,
                     numSeats, choice.substring(0, 1), seatNo);
             if(isAvailable){
                 return new ResponseEntity<>(availableSeatsDto, HttpStatus.OK);
             }
-            AvailableSeatsDto emptyDto = new AvailableSeatsDto();
-            emptyDto.setAvailableSeats(Collections.emptyMap());
-            return new ResponseEntity<>(emptyDto, HttpStatus.OK);
+            return new ResponseEntity<>(Utility.getEmptyAvailabilityResponseDto(), HttpStatus.OK);
 
         }else{
-            return new ResponseEntity<>("Invalid Row Name Added as choice", HttpStatus.OK);
+            return new ResponseEntity<>(INVALID_ROWNAME, HttpStatus.BAD_REQUEST);
         }
     }
 
-    @PostMapping("/screen/{screenName}/reserve")
+    @PostMapping("/screens/{screenName}/reserve")
     public ResponseEntity<?> reserveSeats(@RequestBody SeatInfoDto reserveData, @PathVariable String screenName) {
 
         Screen screenByName = screenRepository.getScreenByName(screenName);
@@ -125,10 +130,10 @@ public class BookingResource {
             return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
         }
 
-        return new ResponseEntity<>(responseDto, HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(responseDto, HttpStatus.BAD_REQUEST);
     }
 
-    @PostMapping("/screen")
+    @PostMapping("/screens")
     public ResponseEntity<Object> createScreen(@RequestBody ScreenInfoDto screenData) {
         Screen screen = screenRepository.save(bookingResourceImpl.getScreenPersistenceObject(screenData));
 
